@@ -30,18 +30,22 @@ export function createApp() {
         });
       }
 
-      const response = await fetch(`${getReqRunBaseUrl()}/v1/chat/completions`, {
+      const path = "/v1/chat/completions";
+      const reqRunBody = {
+        model: req.body?.model?.trim() || "gpt-5-nano",
+        messages: [{ role: "user", content: prompt }],
+        wait: req.body?.wait === true,
+        idempotency_key: req.body?.idempotencyKey?.trim() || `express-${crypto.randomUUID()}`,
+      };
+      const bodyString = JSON.stringify(reqRunBody);
+
+      const response = await fetch(`${getReqRunBaseUrl()}${path}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getReqRunApiKey()}`,
+          ...getSignedReqRunHeaders(path, "POST", bodyString),
         },
-        body: JSON.stringify({
-          model: req.body?.model?.trim() || "gpt-5-nano",
-          messages: [{ role: "user", content: prompt }],
-          wait: req.body?.wait === true,
-          idempotency_key: req.body?.idempotencyKey?.trim() || `express-${crypto.randomUUID()}`,
-        }),
+        body: bodyString,
       });
 
       const payload = await response.json();
@@ -60,9 +64,10 @@ export function createApp() {
 
   app.get("/requests/:id", async (req, res) => {
     try {
-      const response = await fetch(`${getReqRunBaseUrl()}/v1/requests/${req.params.id}`, {
+      const path = `/v1/requests/${req.params.id}`;
+      const response = await fetch(`${getReqRunBaseUrl()}${path}`, {
         headers: {
-          Authorization: `Bearer ${getReqRunApiKey()}`,
+          ...getSignedReqRunHeaders(path, "GET"),
         },
       });
 
@@ -95,6 +100,31 @@ function getReqRunApiKey() {
   }
 
   return apiKey;
+}
+
+function getReqRunSigningSecret() {
+  const signingSecret = process.env.REQRUN_SIGNING_SECRET?.trim();
+
+  if (!signingSecret) {
+    throw new Error("Missing REQRUN_SIGNING_SECRET. Copy .env.example to .env and add the signing secret shown when you created the key.");
+  }
+
+  return signingSecret;
+}
+
+function getSignedReqRunHeaders(path, method, bodyString = "") {
+  const timestamp = new Date().toISOString();
+  const nonce = crypto.randomUUID().replace(/-/g, "");
+  const bodyHash = crypto.createHash("sha256").update(bodyString).digest("hex");
+  const signaturePayload = [method, path, timestamp, nonce, bodyHash].join("\n");
+  const signature = crypto.createHmac("sha256", getReqRunSigningSecret()).update(signaturePayload).digest("hex");
+
+  return {
+    Authorization: `Bearer ${getReqRunApiKey()}`,
+    "X-ReqRun-Timestamp": timestamp,
+    "X-ReqRun-Nonce": nonce,
+    "X-ReqRun-Signature": `v1=${signature}`,
+  };
 }
 
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {

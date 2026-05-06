@@ -12,7 +12,7 @@ Runnable Express example that accepts app requests and hands the model call off 
 ## Prerequisites
 
 - Node.js 20+
-- a ReqRun project API key from [https://app.reqrun.com](https://app.reqrun.com)
+- a ReqRun project API key and signing secret from [https://app.reqrun.com](https://app.reqrun.com)
 
 ## Setup
 
@@ -26,6 +26,7 @@ cp .env.example .env
 
 ```env
 REQRUN_API_KEY=REQRUN_LIVE_YOUR_PROJECT_KEY_HERE
+REQRUN_SIGNING_SECRET=REQRUN_SIGNING_SECRET_HERE
 REQRUN_BASE_URL=https://api.reqrun.com
 PORT=3000
 ```
@@ -59,6 +60,8 @@ If ReqRun returns an async object, check status later:
 ```bash
 curl http://localhost:3000/requests/rr_your_request_id_here
 ```
+
+Hosted ReqRun keys use signed requests. Copy the signing secret when the key is created because it is only shown once.
 
 ## ReqRun docs
 
